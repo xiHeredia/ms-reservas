@@ -36,6 +36,12 @@ public class ReservasGrpcService : ReservasGrpc.ReservasGrpcBase
         return Ok(ApiResponse<ReservaResponse>.Ok(result, "Consulta exitosa."));
     }
 
+    public override async Task<JsonReply> ConfirmarPago(GuidRequest request, ServerCallContext context)
+    {
+        var result = await _reservaService.ConfirmarPagoAsync(Guid.Parse(request.Guid), context.CancellationToken);
+        return Ok(ApiResponse<ReservaResponse>.Ok(result, "Pago confirmado correctamente."));
+    }
+
     private static JsonReply Ok<T>(T value)
     {
         return new JsonReply
