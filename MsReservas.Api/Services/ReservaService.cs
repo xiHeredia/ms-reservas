@@ -103,6 +103,47 @@ public class ReservaService
         return ToResponse(reserva);
     }
 
+    public async Task<bool> ActualizarAsync(Guid guid, ActualizarReservaRequest request, CancellationToken cancellationToken)
+    {
+        var clienteGuid = request.ClienteGuid != Guid.Empty ? request.ClienteGuid : request.ClienteId;
+        var horarioGuid = request.HorarioGuid != Guid.Empty ? request.HorarioGuid : request.HorarioId;
+
+        if (clienteGuid == Guid.Empty)
+            throw new ValidationException("El clienteGuid es obligatorio.");
+
+        if (horarioGuid == Guid.Empty)
+            throw new ValidationException("El horarioGuid es obligatorio.");
+
+        if (request.Subtotal < 0)
+            throw new ValidationException("El subtotal no puede ser negativo.");
+
+        if (request.ValorIva is < 0 || request.Total is < 0)
+            throw new ValidationException("Los valores de IVA y total no pueden ser negativos.");
+
+        var reserva = await _context.Reservas.FirstOrDefaultAsync(
+            x => x.RevGuid == guid && x.RevEstado == "A",
+            cancellationToken);
+
+        if (reserva is null)
+            throw new NotFoundException("No se encontro la reserva activa.");
+
+        var valorIva = request.ValorIva ?? Math.Round(request.Subtotal * 0.12m, 2);
+        var total = request.Total ?? request.Subtotal + valorIva;
+
+        reserva.CliGuid = clienteGuid;
+        reserva.HorGuid = horarioGuid;
+        reserva.RevSubtotal = request.Subtotal;
+        reserva.RevValorIva = valorIva;
+        reserva.RevTotal = total;
+        reserva.RevOrigenCanal = string.IsNullOrWhiteSpace(request.OrigenCanal) ? reserva.RevOrigenCanal : request.OrigenCanal.Trim();
+        reserva.RevFechaMod = DateTimeOffset.UtcNow;
+        reserva.RevUsuarioMod = "api";
+        reserva.RevIpMod = "127.0.0.1";
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> CancelarAsync(Guid guid, CancelarReservaRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Motivo))

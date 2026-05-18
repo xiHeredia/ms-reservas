@@ -57,7 +57,16 @@ public class ReservasController : ControllerBase
         return Ok(ApiResponse<ReservaResponse>.Ok(result, "Pago confirmado correctamente."));
     }
 
+    [HttpPut("{guid:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Actualizar(Guid guid, [FromBody] ActualizarReservaRequest request, CancellationToken cancellationToken)
+    {
+        var ok = await _reservaService.ActualizarAsync(guid, request, cancellationToken);
+        return Ok(ApiResponse<bool>.Ok(ok, "Reserva actualizada correctamente."));
+    }
+
     [HttpPost("{guid:guid}/cancelar")]
+    [HttpPatch("{guid:guid}/cancelar")]
     [AllowAnonymous]
     public async Task<IActionResult> Cancelar(Guid guid, [FromBody] CancelarReservaRequest request, CancellationToken cancellationToken)
     {

@@ -21,6 +21,18 @@ public class CancelarReservaRequest
     public string Motivo { get; set; } = null!;
 }
 
+public class ActualizarReservaRequest
+{
+    public Guid ClienteGuid { get; set; }
+    public Guid ClienteId { get; set; }
+    public Guid HorarioGuid { get; set; }
+    public Guid HorarioId { get; set; }
+    public decimal Subtotal { get; set; }
+    public decimal? ValorIva { get; set; }
+    public decimal? Total { get; set; }
+    public string? OrigenCanal { get; set; }
+}
+
 public class ReservaResponse
 {
     public Guid Guid { get; set; }
