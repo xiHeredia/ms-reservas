@@ -24,9 +24,12 @@ public class ReservasGrpcService : ReservasGrpc.ReservasGrpcBase
         return Ok(ApiResponse<ReservaResponse>.Ok(result, "Reserva creada correctamente."));
     }
 
-    public override async Task<JsonReply> Listar(EmptyRequest request, ServerCallContext context)
+    public override async Task<JsonReply> Listar(ListarReservasRequest request, ServerCallContext context)
     {
-        var result = await _reservaService.ListarAsync(context.CancellationToken);
+        var result = Guid.TryParse(request.ClienteGuid, out var clienteGuid)
+            ? await _reservaService.ListarPorClienteAsync(clienteGuid, context.CancellationToken)
+            : await _reservaService.ListarAsync(context.CancellationToken);
+
         return Ok(ApiResponse<IReadOnlyList<ReservaResponse>>.Ok(result, "Consulta exitosa."));
     }
 

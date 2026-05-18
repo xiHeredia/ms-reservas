@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Atracciones.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +23,11 @@ public class ReservasController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Listar(CancellationToken cancellationToken)
     {
-        var result = await _reservaService.ListarAsync(cancellationToken);
+        var clienteGuid = GetClienteGuidFromToken();
+        var result = clienteGuid is null || IsStaff()
+            ? await _reservaService.ListarAsync(cancellationToken)
+            : await _reservaService.ListarPorClienteAsync(clienteGuid.Value, cancellationToken);
+
         return Ok(ApiResponse<IReadOnlyList<ReservaResponse>>.Ok(result, "Consulta exitosa."));
     }
 
@@ -30,6 +36,11 @@ public class ReservasController : ControllerBase
     public async Task<IActionResult> ObtenerPorGuid(Guid guid, CancellationToken cancellationToken)
     {
         var result = await _reservaService.ObtenerPorGuidAsync(guid, cancellationToken);
+
+        var clienteGuid = GetClienteGuidFromToken();
+        if (clienteGuid is not null && !IsStaff() && result.ClienteGuid != clienteGuid.Value)
+            return Forbid();
+
         return Ok(ApiResponse<ReservaResponse>.Ok(result, "Consulta exitosa."));
     }
 
@@ -72,5 +83,19 @@ public class ReservasController : ControllerBase
     {
         var ok = await _reservaService.CancelarAsync(guid, request, cancellationToken);
         return Ok(ApiResponse<bool>.Ok(ok, "Reserva cancelada correctamente."));
+    }
+
+    private Guid? GetClienteGuidFromToken()
+    {
+        if (User.Identity?.IsAuthenticated != true)
+            return null;
+
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(sub, out var guid) ? guid : null;
+    }
+
+    private bool IsStaff()
+    {
+        return User.IsInRole("ADMIN") || User.IsInRole("OPERADOR");
     }
 }

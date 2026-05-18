@@ -17,9 +17,28 @@ public class ReservaService
 
     public async Task<IReadOnlyList<ReservaResponse>> ListarAsync(CancellationToken cancellationToken)
     {
-        var reservas = await _context.Reservas
+        return await ListarInternalAsync(clienteGuid: null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ReservaResponse>> ListarPorClienteAsync(Guid clienteGuid, CancellationToken cancellationToken)
+    {
+        if (clienteGuid == Guid.Empty)
+            throw new ValidationException("El clienteGuid es obligatorio.");
+
+        return await ListarInternalAsync(clienteGuid, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ReservaResponse>> ListarInternalAsync(Guid? clienteGuid, CancellationToken cancellationToken)
+    {
+        var query = _context.Reservas
             .AsNoTracking()
             .Include(x => x.Detalles.Where(d => d.RdetEstado == "A"))
+            .AsQueryable();
+
+        if (clienteGuid is not null)
+            query = query.Where(x => x.CliGuid == clienteGuid.Value);
+
+        var reservas = await query
             .OrderByDescending(x => x.RevFechaReservaUtc)
             .ToListAsync(cancellationToken);
 
