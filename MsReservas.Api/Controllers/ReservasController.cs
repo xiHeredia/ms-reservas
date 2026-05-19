@@ -48,6 +48,10 @@ public class ReservasController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Crear([FromBody] CrearReservaRequest request, CancellationToken cancellationToken)
     {
+        var clienteGuid = GetClienteGuidFromToken();
+        if (clienteGuid is not null && !IsStaff())
+            request.ClienteGuid = clienteGuid.Value;
+
         var result = await _reservaService.CrearAsync(request, cancellationToken);
         return Ok(ApiResponse<ReservaResponse>.Ok(result, "Reserva creada correctamente."));
     }
@@ -62,10 +66,13 @@ public class ReservasController : ControllerBase
 
     [HttpPost("{guid:guid}/pagos/confirmacion")]
     [AllowAnonymous]
-    public async Task<IActionResult> ConfirmarPagoBooking(Guid guid, CancellationToken cancellationToken)
+    public async Task<IActionResult> ConfirmarPagoBooking(
+        Guid guid,
+        [FromBody] ConfirmarPagoRequest? request,
+        CancellationToken cancellationToken)
     {
-        var result = await _reservaService.ConfirmarPagoAsync(guid, cancellationToken);
-        return Ok(ApiResponse<ReservaResponse>.Ok(result, "Pago confirmado correctamente."));
+        var result = await _reservaService.ConfirmarPagoBookingAsync(guid, request ?? new ConfirmarPagoRequest(), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<PagoConfirmadoResponse>.Ok(result, "Pago confirmado correctamente."));
     }
 
     [HttpPut("{guid:guid}")]

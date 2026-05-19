@@ -70,7 +70,7 @@ public class ReservaService
         {
             RevGuid = Guid.NewGuid(),
             RevCodigo = GenerateCode(),
-            CliGuid = request.ClienteGuid,
+            CliGuid = request.ClienteGuid == Guid.Empty ? Guid.NewGuid() : request.ClienteGuid,
             HorGuid = request.HorarioGuid,
             RevFechaReservaUtc = DateTimeOffset.UtcNow,
             RevSubtotal = subtotal,
@@ -120,6 +120,44 @@ public class ReservaService
         await _context.SaveChangesAsync(cancellationToken);
 
         return ToResponse(reserva);
+    }
+
+    public async Task<PagoConfirmadoResponse> ConfirmarPagoBookingAsync(
+        Guid guid,
+        ConfirmarPagoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var reserva = await _context.Reservas
+            .Include(x => x.Detalles.Where(d => d.RdetEstado == "A"))
+            .FirstOrDefaultAsync(x => x.RevGuid == guid, cancellationToken);
+
+        if (reserva is null)
+            throw new NotFoundException("No se encontro la reserva.");
+
+        reserva.RevFechaMod = DateTimeOffset.UtcNow;
+        reserva.RevUsuarioMod = "booking";
+        reserva.RevIpMod = "127.0.0.1";
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var nombre = string.IsNullOrWhiteSpace(request.NombreReceptor)
+            ? "Consumidor"
+            : request.NombreReceptor.Trim();
+
+        var correo = string.IsNullOrWhiteSpace(request.CorreoReceptor)
+            ? "sin-correo@booking.local"
+            : request.CorreoReceptor.Trim();
+
+        return new PagoConfirmadoResponse
+        {
+            FacGuid = Guid.NewGuid(),
+            FacNumero = GenerateInvoiceNumber(),
+            RevCodigo = reserva.RevCodigo,
+            Total = reserva.RevTotal,
+            FechaEmision = DateTimeOffset.UtcNow,
+            NombreReceptor = nombre,
+            CorreoReceptor = correo
+        };
     }
 
     public async Task<bool> ActualizarAsync(Guid guid, ActualizarReservaRequest request, CancellationToken cancellationToken)
@@ -191,19 +229,31 @@ public class ReservaService
     {
         var errors = new List<string>();
 
-        if (request.ClienteGuid == Guid.Empty)
-            errors.Add("El clienteGuid es obligatorio.");
+        if (request.ClienteGuid == Guid.Empty && request.ClienteInvitado is null)
+            errors.Add("Debe enviar clienteGuid o cliente_invitado.");
+
+        if (request.ClienteInvitado is not null)
+        {
+            if (string.IsNullOrWhiteSpace(request.ClienteInvitado.TipoIdentificacion))
+                errors.Add("cliente_invitado.tipo_identificacion es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.ClienteInvitado.NumeroIdentificacion))
+                errors.Add("cliente_invitado.numero_identificacion es obligatorio.");
+
+            if (string.IsNullOrWhiteSpace(request.ClienteInvitado.Correo))
+                errors.Add("cliente_invitado.correo es obligatorio.");
+        }
 
         if (request.HorarioGuid == Guid.Empty)
-            errors.Add("El horarioGuid es obligatorio.");
+            errors.Add("El hor_guid es obligatorio.");
 
         if (request.Detalles.Count == 0)
-            errors.Add("Debe agregar al menos un detalle de reserva.");
+            errors.Add("Debe agregar al menos una linea de reserva.");
 
         foreach (var detalle in request.Detalles)
         {
             if (detalle.TicketGuid == Guid.Empty)
-                errors.Add("Cada detalle debe tener ticketGuid.");
+                errors.Add("Cada linea debe tener tck_guid.");
 
             if (detalle.Cantidad <= 0)
                 errors.Add("La cantidad debe ser mayor a cero.");
@@ -250,5 +300,10 @@ public class ReservaService
     private static string GenerateCode()
     {
         return $"RSV{DateTime.UtcNow:yyMMddHHmmss}{Random.Shared.Next(1000, 9999)}";
+    }
+
+    private static string GenerateInvoiceNumber()
+    {
+        return $"FAC{DateTime.UtcNow:yyMMddHHmmss}{Random.Shared.Next(10, 99)}";
     }
 }
