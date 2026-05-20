@@ -108,10 +108,16 @@ public class ReservaService
     {
         var reserva = await _context.Reservas
             .Include(x => x.Detalles.Where(d => d.RdetEstado == "A"))
-            .FirstOrDefaultAsync(x => x.RevGuid == guid && x.RevEstado == "A", cancellationToken);
+            .FirstOrDefaultAsync(x => x.RevGuid == guid, cancellationToken);
 
         if (reserva is null)
-            throw new NotFoundException("No se encontro la reserva activa.");
+            throw new NotFoundException("No se encontro la reserva.");
+
+        if (reserva.RevEstado == "P")
+            throw new ConflictException("La reserva ya fue pagada.");
+
+        if (reserva.RevEstado != "A")
+            throw new ConflictException("La reserva no esta en estado pendiente de pago.");
 
         reserva.RevFechaMod = DateTimeOffset.UtcNow;
         reserva.RevUsuarioMod = "api";
@@ -134,6 +140,12 @@ public class ReservaService
 
         if (reserva is null)
             throw new NotFoundException("No se encontro la reserva.");
+
+        if (reserva.RevEstado == "P")
+            throw new ConflictException("La reserva ya fue pagada.");
+
+        if (reserva.RevEstado != "A")
+            throw new ConflictException("La reserva no esta en estado pendiente de pago.");
 
         reserva.RevFechaMod = DateTimeOffset.UtcNow;
         reserva.RevUsuarioMod = "booking";

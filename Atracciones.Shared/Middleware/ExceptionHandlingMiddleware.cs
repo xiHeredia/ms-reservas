@@ -31,6 +31,10 @@ public class ExceptionHandlingMiddleware
         {
             await WriteErrorAsync(context, HttpStatusCode.NotFound, ex.Message);
         }
+        catch (ConflictException ex)
+        {
+            await WriteErrorAsync(context, HttpStatusCode.Conflict, ex.Message);
+        }
         catch (UnauthorizedBusinessException ex)
         {
             await WriteErrorAsync(context, HttpStatusCode.Unauthorized, ex.Message);
