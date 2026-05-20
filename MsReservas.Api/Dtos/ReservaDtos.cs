@@ -164,33 +164,28 @@ public class ConfirmarPagoRequest
 
 public class PagoConfirmadoResponse
 {
-    public Guid FacGuid { get; set; }
-    public string FacNumero { get; set; } = null!;
-    public string RevCodigo { get; set; } = null!;
-    public decimal Total { get; set; }
-    public string Moneda { get; set; } = "USD";
-    public DateTimeOffset FechaEmision { get; set; }
-    public string Estado { get; set; } = "E";
-    public string NombreReceptor { get; set; } = null!;
-    public string CorreoReceptor { get; set; } = null!;
-
     [JsonPropertyName("fac_guid")]
-    public Guid FacGuidSnake => FacGuid;
+    public Guid FacGuid { get; set; }
 
     [JsonPropertyName("fac_numero")]
-    public string FacNumeroSnake => FacNumero;
+    public string FacNumero { get; set; } = null!;
 
     [JsonPropertyName("rev_codigo")]
-    public string RevCodigoSnake => RevCodigo;
+    public string RevCodigo { get; set; } = null!;
+
+    public decimal Total { get; set; }
+    public string Moneda { get; set; } = "USD";
 
     [JsonPropertyName("fecha_emision")]
-    public DateTimeOffset FechaEmisionSnake => FechaEmision;
+    public DateTimeOffset FechaEmision { get; set; }
+
+    public string Estado { get; set; } = "E";
 
     [JsonPropertyName("nombre_receptor")]
-    public string NombreReceptorSnake => NombreReceptor;
+    public string NombreReceptor { get; set; } = null!;
 
     [JsonPropertyName("correo_receptor")]
-    public string CorreoReceptorSnake => CorreoReceptor;
+    public string CorreoReceptor { get; set; } = null!;
 }
 
 public class ActualizarReservaRequest
