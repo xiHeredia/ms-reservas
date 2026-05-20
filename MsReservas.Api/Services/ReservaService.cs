@@ -116,6 +116,7 @@ public class ReservaService
         reserva.RevFechaMod = DateTimeOffset.UtcNow;
         reserva.RevUsuarioMod = "api";
         reserva.RevIpMod = "127.0.0.1";
+        reserva.RevEstado = "P";
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -137,6 +138,7 @@ public class ReservaService
         reserva.RevFechaMod = DateTimeOffset.UtcNow;
         reserva.RevUsuarioMod = "booking";
         reserva.RevIpMod = "127.0.0.1";
+        reserva.RevEstado = "P";
 
         await _context.SaveChangesAsync(cancellationToken);
 
