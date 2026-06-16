@@ -1,4 +1,5 @@
 using Atracciones.Shared.Extensions;
+using Atracciones.Shared.Messaging;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using MsReservas.Api.Data;
@@ -16,6 +17,8 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddAtraccionesApiDefaults(builder.Configuration, "ms-reservas");
 builder.Services.AddDbContext<ReservasDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("ReservasDb")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddRabbitMqEventBus(builder.Configuration);
 builder.Services.AddScoped<ReservaService>();
 builder.Services.AddGrpc();
 

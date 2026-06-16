@@ -1,4 +1,6 @@
 using Atracciones.Shared.Exceptions;
+using Atracciones.Shared.Messaging;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using MsReservas.Api.Data;
 using MsReservas.Api.Data.Entities;
@@ -9,10 +11,17 @@ namespace MsReservas.Api.Services;
 public class ReservaService
 {
     private readonly ReservasDbContext _context;
+    private readonly IEventBusPublisher _eventBus;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public ReservaService(ReservasDbContext context)
+    public ReservaService(
+        ReservasDbContext context,
+        IEventBusPublisher eventBus,
+        IHttpContextAccessor httpContextAccessor)
     {
         _context = context;
+        _eventBus = eventBus;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<IReadOnlyList<ReservaResponse>> ListarAsync(CancellationToken cancellationToken)
@@ -100,6 +109,10 @@ public class ReservaService
 
         await _context.Reservas.AddAsync(reserva, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+        await PublishReservaEventAsync("reservas.reserva.creada", reserva, new
+        {
+            cupos_descontados_por_gateway = true
+        }, cancellationToken);
 
         return ToResponse(reserva);
     }
@@ -125,6 +138,12 @@ public class ReservaService
         reserva.RevEstado = "P";
 
         await _context.SaveChangesAsync(cancellationToken);
+        await PublishReservaEventAsync("reservas.reserva.pagada", reserva, new
+        {
+            nombre_receptor = "Consumidor",
+            correo_receptor = "sin-correo@booking.local",
+            factura_generada_por_gateway = false
+        }, cancellationToken);
 
         return ToResponse(reserva);
     }
@@ -162,10 +181,22 @@ public class ReservaService
             ? "sin-correo@booking.local"
             : request.CorreoReceptor.Trim();
 
+        var facNumero = GenerateInvoiceNumber();
+        await PublishReservaEventAsync("reservas.reserva.pagada", reserva, new
+        {
+            fac_numero = facNumero,
+            nombre_receptor = nombre,
+            apellido_receptor = request.ApellidoReceptor,
+            correo_receptor = correo,
+            telefono_receptor = request.TelefonoReceptor,
+            observacion = request.Observacion,
+            factura_generada_por_gateway = true
+        }, cancellationToken);
+
         return new PagoConfirmadoResponse
         {
             FacGuid = Guid.NewGuid(),
-            FacNumero = GenerateInvoiceNumber(),
+            FacNumero = facNumero,
             RevCodigo = reserva.RevCodigo,
             Total = reserva.RevTotal,
             FechaEmision = DateTimeOffset.UtcNow,
@@ -236,6 +267,12 @@ public class ReservaService
         reserva.RevMotivoCancelacion = request.Motivo.Trim();
 
         await _context.SaveChangesAsync(cancellationToken);
+        await PublishReservaEventAsync("reservas.reserva.cancelada", reserva, new
+        {
+            motivo = request.Motivo.Trim(),
+            cupos_liberados_por_gateway = true
+        }, cancellationToken);
+
         return true;
     }
 
@@ -319,5 +356,47 @@ public class ReservaService
     private static string GenerateInvoiceNumber()
     {
         return $"FAC{DateTime.UtcNow:yyMMddHHmmss}{Random.Shared.Next(10, 99)}";
+    }
+
+    private async Task PublishReservaEventAsync(
+        string routingKey,
+        ReservaEntity reserva,
+        object extra,
+        CancellationToken cancellationToken)
+    {
+        var payload = new
+        {
+            rev_guid = reserva.RevGuid,
+            rev_codigo = reserva.RevCodigo,
+            cli_guid = reserva.CliGuid,
+            hor_guid = reserva.HorGuid,
+            estado = reserva.RevEstado,
+            origen_canal = reserva.RevOrigenCanal,
+            subtotal = reserva.RevSubtotal,
+            valor_iva = reserva.RevValorIva,
+            total = reserva.RevTotal,
+            fecha_reserva_utc = reserva.RevFechaReservaUtc,
+            detalles = reserva.Detalles
+                .Where(x => x.RdetEstado == "A")
+                .Select(x => new
+                {
+                    rdet_guid = x.RdetGuid,
+                    tck_guid = x.TckGuid,
+                    cantidad = x.RdetCantidad,
+                    precio_unitario = x.RdetPrecioUnit,
+                    subtotal = x.RdetSubtotal
+                })
+                .ToList(),
+            metadata = extra
+        };
+
+        await _eventBus.PublishAsync(routingKey, payload, GetCorrelationId(), cancellationToken);
+    }
+
+    private string? GetCorrelationId()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        return context?.Request.Headers["X-Correlation-ID"].FirstOrDefault()
+            ?? context?.TraceIdentifier;
     }
 }
