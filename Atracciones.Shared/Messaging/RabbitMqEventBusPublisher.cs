@@ -25,15 +25,7 @@ public class RabbitMqEventBusPublisher : IEventBusPublisher
 
         try
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = _options.HostName,
-                Port = _options.Port,
-                UserName = _options.UserName,
-                Password = _options.Password,
-                VirtualHost = _options.VirtualHost,
-                DispatchConsumersAsync = true
-            };
+            var factory = CreateConnectionFactory();
 
             using var connection = factory.CreateConnection();
             using var channel = connection.CreateModel();
@@ -62,5 +54,35 @@ public class RabbitMqEventBusPublisher : IEventBusPublisher
         }
 
         return Task.CompletedTask;
+    }
+
+    private ConnectionFactory CreateConnectionFactory()
+    {
+        if (!string.IsNullOrWhiteSpace(_options.Uri))
+        {
+            return new ConnectionFactory
+            {
+                Uri = new Uri(_options.Uri),
+                DispatchConsumersAsync = true
+            };
+        }
+
+        var factory = new ConnectionFactory
+        {
+            HostName = _options.HostName,
+            Port = _options.Port,
+            UserName = _options.UserName,
+            Password = _options.Password,
+            VirtualHost = _options.VirtualHost,
+            DispatchConsumersAsync = true
+        };
+
+        if (_options.UseSsl)
+        {
+            factory.Ssl.Enabled = true;
+            factory.Ssl.ServerName = _options.HostName;
+        }
+
+        return factory;
     }
 }
